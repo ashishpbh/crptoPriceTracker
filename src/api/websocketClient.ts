@@ -38,6 +38,8 @@ export class WebSocketMarketTransport implements MarketTransport {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private retryCount = 0;
   private intentionalClose = false;
+  /** Bumped when retiring a socket so a late async onclose cannot schedule a ghost reconnect. */
+  private socketGeneration = 0;
 
   constructor(private readonly url = marketConfig.wsUrl) {}
 
@@ -52,11 +54,12 @@ export class WebSocketMarketTransport implements MarketTransport {
         ? CONNECTION_STATUS.CONNECTING
         : CONNECTION_STATUS.RECONNECTING,
     );
+    const generation = this.socketGeneration;
     const socket = new WebSocket(this.url);
     this.socket = socket;
 
     socket.onopen = () => {
-      if (this.socket !== socket) return;
+      if (generation !== this.socketGeneration || this.socket !== socket) return;
       this.retryCount = 0;
       this.setStatus(CONNECTION_STATUS.CONNECTED);
       if (this.subscribeFlushTimer) clearTimeout(this.subscribeFlushTimer);
@@ -65,9 +68,17 @@ export class WebSocketMarketTransport implements MarketTransport {
       this.sendCurrentSubscriptions();
     };
 
-    socket.onmessage = event => this.handleMessage(event.data);
-    socket.onerror = () => socket.close();
+    socket.onmessage = event => {
+      if (generation !== this.socketGeneration) return;
+      this.handleMessage(event.data);
+    };
+    socket.onerror = () => {
+      if (generation !== this.socketGeneration) return;
+      socket.close();
+    };
     socket.onclose = () => {
+      // Stale socket after reconnectNow/disconnect — ignore completely.
+      if (generation !== this.socketGeneration) return;
       if (this.socket === socket) this.socket = null;
       if (this.intentionalClose) {
         this.setStatus(CONNECTION_STATUS.DISCONNECTED);
@@ -85,29 +96,34 @@ export class WebSocketMarketTransport implements MarketTransport {
     if (this.subscribeFlushTimer) clearTimeout(this.subscribeFlushTimer);
     this.subscribeFlushTimer = null;
     this.pendingSubscribeSymbols.clear();
-    this.socket?.close();
-    this.socket = null;
+    this.retireSocket();
     this.retryCount = 0;
     this.setStatus(CONNECTION_STATUS.DISCONNECTED);
   }
 
   reconnectNow() {
-    this.intentionalClose = false;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-
-    if (this.socket) {
-      const socket = this.socket;
-      // Close without scheduling another backoff from this close.
-      this.intentionalClose = true;
-      socket.close();
-      if (this.socket === socket) this.socket = null;
-      this.intentionalClose = false;
-    }
-
+    // Retire the live socket (generation++) before opening a new one so its
+    // async onclose cannot call scheduleReconnect after intentionalClose flips.
+    this.retireSocket();
+    this.intentionalClose = false;
     this.connect();
+  }
+
+  /** Drop the current socket and invalidate its handlers via generation bump. */
+  private retireSocket() {
+    this.socketGeneration += 1;
+    const socket = this.socket;
+    this.socket = null;
+    if (!socket) return;
+    socket.onopen = null;
+    socket.onmessage = null;
+    socket.onerror = null;
+    socket.onclose = null;
+    socket.close();
   }
 
   // Note:
