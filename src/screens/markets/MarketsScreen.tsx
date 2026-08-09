@@ -9,7 +9,11 @@ import {
   selectFavoriteSymbols,
   selectToggleFavorite,
 } from '@/selectors/favoritesSelectors';
-import { selectConnectionStatus } from '@/selectors/marketSelectors';
+import { marketRepository } from '@/api/marketRepository';
+import {
+  selectConnectionStatus,
+  selectReconnectAttempt,
+} from '@/selectors/marketSelectors';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useMarketStore } from '@/stores/marketStore';
 import { normalizeSearchQuery } from '@/utils/format';
@@ -22,6 +26,7 @@ export function MarketsScreen({ navigation }: MarketsScreenProps) {
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<MarketsTab>(MARKETS_TAB.ALL);
   const status = useMarketStore(selectConnectionStatus);
+  const attempt = useMarketStore(selectReconnectAttempt);
   const favorites = useFavoritesStore(selectFavoriteSymbols);
   const toggleFavorite = useFavoritesStore(selectToggleFavorite);
   useTickerSubscriptions(SYMBOLS);
@@ -46,7 +51,13 @@ export function MarketsScreen({ navigation }: MarketsScreenProps) {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.screen}>
-      <MarketsTopBar query={query} onChangeQuery={setQuery} status={status} />
+      <MarketsTopBar
+        attempt={attempt}
+        onChangeQuery={setQuery}
+        onRetry={() => marketRepository.reconnect()}
+        query={query}
+        status={status}
+      />
       <MarketsListSection
         activeTab={activeTab}
         onPressProduct={onPressProduct}

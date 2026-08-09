@@ -13,10 +13,11 @@ import {
 
 interface MarketState {
   status: ConnectionStatus;
+  reconnectAttempt: number;
   tickers: Partial<Record<Symbol, TickerMessage>>;
   orderbooks: Partial<Record<Symbol, OrderbookSnapshot>>;
   trades: Partial<Record<Symbol, TradeMessage[]>>;
-  setStatus: (status: ConnectionStatus) => void;
+  setStatus: (status: ConnectionStatus, attempt?: number) => void;
   applyBatch: (batch: MarketBatch) => void;
 }
 
@@ -36,10 +37,11 @@ function tickersEqualForUi(left: TickerMessage | undefined, right: TickerMessage
 
 export const useMarketStore = create<MarketState>(set => ({
   status: CONNECTION_STATUS.DISCONNECTED,
+  reconnectAttempt: 0,
   tickers: {},
   orderbooks: {},
   trades: {},
-  setStatus: status => set({ status }),
+  setStatus: (status, attempt = 0) => set({ status, reconnectAttempt: attempt }),
   applyBatch: batch =>
     set(state => {
       let nextTickers = state.tickers;

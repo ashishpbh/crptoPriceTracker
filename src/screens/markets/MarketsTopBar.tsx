@@ -9,10 +9,14 @@ import { marketsStyles as styles } from './styles';
 
 export function MarketsTopBar({
   status,
+  attempt = 0,
+  onRetry,
   query,
   onChangeQuery,
 }: {
   status: ConnectionStatus;
+  attempt?: number;
+  onRetry?: () => void;
   query: string;
   onChangeQuery: (value: string) => void;
 }) {
@@ -23,7 +27,7 @@ export function MarketsTopBar({
           <Text style={styles.eyebrow}>{i18.marketsEyebrow}</Text>
           <Text style={styles.title}>{i18.marketsTitle}</Text>
         </View>
-        <ConnectionStatusBadge status={status} />
+        <ConnectionStatusBadge attempt={attempt} onRetry={onRetry} status={status} />
       </View>
       <View style={styles.searchWrap}>
         <TextInput

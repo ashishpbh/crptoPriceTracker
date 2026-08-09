@@ -31,3 +31,10 @@ export const MAX_RETRY_DELAY_MS = 10_000;
 
 /** Grace before wire-unsubscribe (Strict Mode remount). */
 export const UNSUBSCRIBE_GRACE_MS = 100;
+
+/**
+ * Ticker UI throttle window (WHEN). Flush still lands on rAF (HOW).
+ * Mock server ticks every 10–50ms; painting that often jitters the list.
+ * Set to 0 for rAF-only tickers (legacy cadence). Orderbook/trades stay rAF-only.
+ */
+export const TICKER_UI_THROTTLE_MS = 300;

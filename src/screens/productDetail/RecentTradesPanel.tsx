@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import type { TradeMessage } from '@/commonUtils';
@@ -8,14 +8,46 @@ import { i18 } from '@/i18';
 
 import { productDetailStyles as styles } from './styles';
 
+function tradeKey(trade: TradeMessage) {
+  return `${trade.timestamp}-${trade.price}-${trade.size}-${trade.buyer_role}`;
+}
+
 function keyExtractor(item: TradeMessage) {
-  return `${item.timestamp}-${item.price}-${item.size}`;
+  return tradeKey(item);
 }
 
 export function RecentTradesPanel({ trades }: { trades: TradeMessage[] }) {
+  const seededRef = useRef(false);
+  const lastTopKeyRef = useRef<string | null>(null);
+  const [flashKey, setFlashKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const top = trades[0];
+    if (!top) return;
+
+    const key = tradeKey(top);
+
+    // First non-empty paint: seed silently (no flash storm on open).
+    if (!seededRef.current) {
+      seededRef.current = true;
+      lastTopKeyRef.current = key;
+      return;
+    }
+
+    if (key !== lastTopKeyRef.current) {
+      lastTopKeyRef.current = key;
+      setFlashKey(key);
+    }
+  }, [trades]);
+
   const renderTrade = useCallback(
-    ({ item }: { item: TradeMessage }) => <TradeRow trade={item} />,
-    [],
+    ({ item, index }: { item: TradeMessage; index: number }) => (
+      <TradeRow
+        highlight={index === 0 && flashKey === tradeKey(item)}
+        trade={item}
+      />
+    ),
+    [flashKey],
   );
 
   return (
@@ -29,6 +61,7 @@ export function RecentTradesPanel({ trades }: { trades: TradeMessage[] }) {
       </View>
       <FlashList
         data={trades}
+        extraData={flashKey}
         keyExtractor={keyExtractor}
         ListEmptyComponent={
           <Text style={styles.emptyTrades}>{i18.waitingForTrades}</Text>

@@ -47,13 +47,15 @@ No external APIs are required — all market data comes from the local mock serv
 
 - **UI / logic split:** Screens and components never open a WebSocket. They call `marketRepository` through subscription hooks (`useTickerSubscriptions`, `useProductDetailSubscriptions`) and read Zustand via dedicated selectors.
 
-- **Transport:** A single shared WebSocket with ref-counted subscribe/unsubscribe, a short grace window for React Strict Mode remounts, and exponential reconnect backoff. Connection status is surfaced in the UI.
+- **Transport:** A single shared WebSocket with ref-counted subscribe/unsubscribe, a short grace window for React Strict Mode remounts, and exponential reconnect via reusable `exponentialBackoffMs`. Status badge/footer supports tap-to-retry (skips backoff); `AppState` active resumes with `ensureConnected()`. `__DEV__` `[WS subscriptions]` logs show live channel/symbol ref-counts for demos.
 
-- **Performance:** Incoming messages are batched with `requestAnimationFrame` before store writes; order books are trimmed to the top 10 levels on ingest; trades are capped at 30; per-symbol selectors keep list row updates independent.
+- **Errors:** Two failure domains — transport (badge retry / backoff / AppState) vs React render crashes (`AppErrorBoundary` with Try again).
+
+- **Performance:** Channel-aware buffering — tickers use throttle (WHEN, ~300ms) + `requestAnimationFrame` (HOW, paint-aligned); orderbook/trades stay rAF-only so detail stays snappy. Order books are trimmed to the top 10 levels on ingest; trades are capped at 30; per-symbol selectors keep list row updates independent.
 
 - **Favorites:** Persisted with Zustand + AsyncStorage so they survive app restarts.
 
-- **Motion:** New trade rows highlight briefly via Reanimated.
+- **UI:** Dark trading palette (shared tokens in `constants/colors.ts`). Only the newest trade flashes a buy/sell background (~720ms) via Reanimated; the first paint of the tape is seeded silently so opening detail doesn’t splash the whole list.
 
 ## What I’d improve with more time
 
@@ -66,7 +68,7 @@ No external APIs are required — all market data comes from the local mock serv
 
 ```
 src/
-  commonUtils/   # Shared market primitives: SYMBOLS, channel names, WebSocket message types, orderbook shapes
+  commonUtils/   # Shared market primitives: SYMBOLS, channels, backoff helper, message types, orderbook shapes
   api/           # Market data layer (see below)
   stores/        # Zustand state: live market data + favorites
   selectors/     # Narrow store selectors so UI only re-renders what it needs
@@ -84,9 +86,30 @@ src/
 | File | Role |
 | --- | --- |
 | `marketConfig.ts` | WebSocket / HTTP host URLs (`localhost` on iOS, `10.0.2.2` on Android emulator) |
-
-| `websocketClient.ts` | WebSocket transport: connect, subscribe/unsubscribe, reconnect with backoff |
-
-| `marketBuffer.ts` | **requestAnimationFrame (rAF) buffer** — holds fast WebSocket updates and flushes them to the store once per screen frame so the UI is not rewritten on every message |
-
+| `websocketClient.ts` | WebSocket transport: connect, ref-counted subscribe/unsubscribe, Strict Mode grace unsubscribe, `reconnectNow`, backoff via `exponentialBackoffMs` |
+| `marketBuffer.ts` | Channel-aware ingest buffer (see below) — coalesces fast WS updates before store writes |
 | `marketRepository.ts` | App-facing API (`watchTicker`, `watchOrderbook`, `watchTrades`). Screens never open a socket directly |
+
+### Subscriptions (screen → channels)
+
+Subscribe only for data the **current screen** needs; unsubscribe on leave.
+
+| Screen | Channels |
+| --- | --- |
+| Markets / Favorites list | `v2/ticker` only |
+| Product detail | `v2/ticker` + `l2_orderbook` + `all_trades` |
+
+No trade-tape or orderbook prefetch on the markets list.
+
+**Wire vs server log:** Transport is ref-counted and sends **deltas only**. Opening product detail for `ETHUSD` does **not** resubscribe all market tickers — Markets is usually still mounted, so those tickers stay live and only `l2_orderbook` / `all_trades` (and a ticker ref-count bump) are new. If the mock server prints `Client subscriptions: [...]`, that is the **full aggregate** set for the client after the update, not a replay of every prior `subscribe` payload.
+
+### Buffering strategy (`marketBuffer.ts`)
+
+Mock tickers arrive every **10–50ms**. Painting every message makes the list jittery, so ingest is channel-aware:
+
+| Channel | When | How | Why |
+| --- | --- | --- | --- |
+| `v2/ticker` | Throttle (`TICKER_UI_THROTTLE_MS`, default **300ms**). Latest value in the window wins. | Flush on `requestAnimationFrame` | Calm markets list; paint-aligned store writes |
+| `l2_orderbook` / `all_trades` | Every pending update | `requestAnimationFrame` only | Detail stays snappy |
+
+`TICKER_UI_THROTTLE_MS = 0` → ticker path becomes rAF-only (legacy cadence). Store also skips ticker writes when UI-visible fields are unchanged.

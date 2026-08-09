@@ -1,5 +1,6 @@
 import {
   MESSAGE_TYPE,
+  TICKER_UI_THROTTLE_MS,
   VISIBLE_DEPTH,
   type DepthLevel,
   type MarketMessage,
@@ -19,21 +20,36 @@ type FlushListener = (batch: MarketBatch) => void;
 
 type StreamMessage = Exclude<MarketMessage, { type: typeof MESSAGE_TYPE.SUBSCRIPTIONS }>;
 
-/**
- * Holds fast WebSocket updates and applies them to the store once per screen frame.
- */
+// Note:
+// Fast WebSocket messages land here first; we do not push every one to the store/UI.
+// Like a mailbox: many letters arrive, we only bring the newest pile inside.
+//
+// Strategy (channel-aware):
+// - Tickers: THROTTLE (when) + rAF (how).
+//   Throttle caps UI rate (TICKER_UI_THROTTLE_MS). rAF aligns the store write with paint.
+//   Latest price in the window wins. First tick after idle: delay 0 → rAF ASAP.
+//   TICKER_UI_THROTTLE_MS = 0 → rAF only (same cadence as the old ticker path).
+// - Orderbook / trades: rAF only — detail must stay snappy.
 export class MarketBuffer {
   private readonly latestTickers = new Map<Symbol, TickerMessage>();
   private readonly latestOrderbooks = new Map<Symbol, OrderbookSnapshot>();
   private readonly pendingTrades = new Map<Symbol, TradeMessage[]>();
-  private frameId: number | null = null;
+
+  private bookFrameId: number | null = null;
+  private tickerFrameId: number | null = null;
+  private tickerThrottleTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastTickerFlushAt = 0;
 
   constructor(private readonly onFlush: FlushListener) {}
 
   push(message: StreamMessage) {
     if (message.type === MESSAGE_TYPE.TICKER) {
       this.latestTickers.set(message.symbol, message);
-    } else if (message.type === MESSAGE_TYPE.ORDERBOOK) {
+      this.scheduleTickerFlush();
+      return;
+    }
+
+    if (message.type === MESSAGE_TYPE.ORDERBOOK) {
       this.latestOrderbooks.set(
         message.symbol,
         toOrderbookSnapshot(message.bids, message.asks, message.timestamp),
@@ -44,38 +60,85 @@ export class MarketBuffer {
       this.pendingTrades.set(message.symbol, symbolTrades);
     }
 
-    this.scheduleFlush();
+    this.scheduleBookFrameFlush();
   }
 
   dispose() {
-    if (this.frameId !== null) {
-      cancelAnimationFrame(this.frameId);
-      this.frameId = null;
+    if (this.bookFrameId !== null) {
+      cancelAnimationFrame(this.bookFrameId);
+      this.bookFrameId = null;
+    }
+    if (this.tickerFrameId !== null) {
+      cancelAnimationFrame(this.tickerFrameId);
+      this.tickerFrameId = null;
+    }
+    if (this.tickerThrottleTimer !== null) {
+      clearTimeout(this.tickerThrottleTimer);
+      this.tickerThrottleTimer = null;
     }
     this.latestTickers.clear();
     this.latestOrderbooks.clear();
     this.pendingTrades.clear();
   }
 
-  private scheduleFlush() {
-    if (this.frameId !== null) return;
-    this.frameId = requestAnimationFrame(() => this.flush());
+  /**
+   * Throttle decides WHEN we are allowed to publish; rAF decides HOW we publish
+   * (on the next paint). Avoids setTimeout store writes fighting the render loop.
+   */
+  private scheduleTickerFlush() {
+    if (this.tickerThrottleTimer !== null || this.tickerFrameId !== null) return;
+
+    const elapsed = Date.now() - this.lastTickerFlushAt;
+    const delay =
+      elapsed >= TICKER_UI_THROTTLE_MS ? 0 : TICKER_UI_THROTTLE_MS - elapsed;
+
+    this.tickerThrottleTimer = setTimeout(() => {
+      this.tickerThrottleTimer = null;
+      this.scheduleTickerFrameFlush();
+    }, delay);
   }
 
-  private flush() {
-    this.frameId = null;
+  private scheduleTickerFrameFlush() {
+    if (this.tickerFrameId !== null) return;
+    this.tickerFrameId = requestAnimationFrame(() => {
+      this.tickerFrameId = null;
+      this.flushTickers();
+    });
+  }
+
+  private scheduleBookFrameFlush() {
+    if (this.bookFrameId !== null) return;
+    this.bookFrameId = requestAnimationFrame(() => {
+      this.bookFrameId = null;
+      this.flushBooksAndTrades();
+    });
+  }
+
+  private flushTickers() {
+    if (this.latestTickers.size === 0) return;
+
     const tickers: MarketBatch['tickers'] = {};
+    for (const [symbol, ticker] of this.latestTickers) tickers[symbol] = ticker;
+    this.latestTickers.clear();
+    this.lastTickerFlushAt = Date.now();
+    this.onFlush({ tickers, orderbooks: {}, trades: {} });
+  }
+
+  private flushBooksAndTrades() {
     const orderbooks: MarketBatch['orderbooks'] = {};
     const trades: MarketBatch['trades'] = {};
 
-    for (const [symbol, ticker] of this.latestTickers) tickers[symbol] = ticker;
     for (const [symbol, book] of this.latestOrderbooks) orderbooks[symbol] = book;
     for (const [symbol, symbolTrades] of this.pendingTrades) trades[symbol] = symbolTrades;
 
-    this.latestTickers.clear();
     this.latestOrderbooks.clear();
     this.pendingTrades.clear();
-    this.onFlush({ tickers, orderbooks, trades });
+
+    if (Object.keys(orderbooks).length === 0 && Object.keys(trades).length === 0) {
+      return;
+    }
+
+    this.onFlush({ tickers: {}, orderbooks, trades });
   }
 }
 

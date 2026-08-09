@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { marketRepository } from '@/api/marketRepository';
 import { isSymbol, type Symbol } from '@/commonUtils';
 import { ConnectionStatusBadge } from '@/components/connectionStatus';
 import { MarketMetrics } from '@/components/marketMetrics';
@@ -15,6 +16,7 @@ import {
 import {
   selectConnectionStatus,
   selectOrderbook,
+  selectReconnectAttempt,
   selectTicker,
   selectTrades,
 } from '@/selectors/marketSelectors';
@@ -36,6 +38,7 @@ export function ProductDetailScreen({ navigation, route }: ProductDetailScreenPr
   const orderbook = useMarketStore(selectOrderbook(symbol));
   const trades = useMarketStore(selectTrades(symbol));
   const status = useMarketStore(selectConnectionStatus);
+  const attempt = useMarketStore(selectReconnectAttempt);
   const isFavorite = useFavoritesStore(selectIsFavorite(symbol));
   const toggleFavorite = useFavoritesStore(selectToggleFavorite);
 
@@ -55,7 +58,12 @@ export function ProductDetailScreen({ navigation, route }: ProductDetailScreenPr
         </View>
         <RecentTradesPanel trades={trades} />
       </View>
-      <ConnectionStatusBadge status={status} variant="footer" />
+      <ConnectionStatusBadge
+        attempt={attempt}
+        onRetry={() => marketRepository.reconnect()}
+        status={status}
+        variant="footer"
+      />
     </SafeAreaView>
   );
 }

@@ -49,10 +49,15 @@ export const i18 = {
   statusConnecting: 'Connecting',
   statusReconnecting: 'Reconnecting',
   statusOffline: 'Offline',
+  statusTapRetry: 'Tap to retry',
   footerConnected: 'WebSocket connected · Live updates active',
   footerConnecting: 'WebSocket connecting…',
   footerReconnecting: 'WebSocket reconnecting…',
   footerDisconnected: 'WebSocket disconnected',
+  footerTapRetry: ' · Tap to retry',
+  errorBoundaryTitle: 'Something went wrong',
+  errorBoundaryCopy: 'The screen hit an unexpected error. You can try again.',
+  errorBoundaryRetry: 'Try again',
 
   productNames: {
     BTCUSD: 'Bitcoin Perpetual',

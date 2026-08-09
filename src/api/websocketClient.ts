@@ -1,9 +1,10 @@
 import {
   CHANNEL,
   CONNECTION_STATUS,
-  MAX_RETRY_DELAY_MS,
   SUBSCRIPTION_ACTION,
   UNSUBSCRIBE_GRACE_MS,
+  exponentialBackoffMs,
+  type ConnectionInfo,
   type ConnectionStatus,
   type MarketChannel,
   type MarketMessage,
@@ -17,16 +18,19 @@ import { marketConfig } from './marketConfig';
 export interface MarketTransport {
   connect(): void;
   disconnect(): void;
+  /** Cancel backoff wait and connect immediately (user retry / AppState). */
+  reconnectNow(): void;
   subscribe(channel: MarketChannel, symbol: Symbol): Cleanup;
   onMessage(listener: (message: MarketMessage) => void): Cleanup;
-  onStatusChange(listener: (status: ConnectionStatus) => void): Cleanup;
+  onStatusChange(listener: (info: ConnectionInfo) => void): Cleanup;
 }
 
 export class WebSocketMarketTransport implements MarketTransport {
   private socket: WebSocket | null = null;
   private status: ConnectionStatus = CONNECTION_STATUS.DISCONNECTED;
+  private lastPublished: ConnectionInfo | null = null;
   private readonly messageListeners = new Set<(message: MarketMessage) => void>();
-  private readonly statusListeners = new Set<(status: ConnectionStatus) => void>();
+  private readonly statusListeners = new Set<(info: ConnectionInfo) => void>();
   private readonly subscriptions = new Map<MarketChannel, Map<Symbol, number>>();
   private readonly pendingUnsubscribes = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly pendingSubscribeSymbols = new Map<MarketChannel, Set<Symbol>>();
@@ -52,7 +56,6 @@ export class WebSocketMarketTransport implements MarketTransport {
     this.socket = socket;
 
     socket.onopen = () => {
-      console.log('Ashish : socket.onopen');
       if (this.socket !== socket) return;
       this.retryCount = 0;
       this.setStatus(CONNECTION_STATUS.CONNECTED);
@@ -84,7 +87,27 @@ export class WebSocketMarketTransport implements MarketTransport {
     this.pendingSubscribeSymbols.clear();
     this.socket?.close();
     this.socket = null;
+    this.retryCount = 0;
     this.setStatus(CONNECTION_STATUS.DISCONNECTED);
+  }
+
+  reconnectNow() {
+    this.intentionalClose = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    if (this.socket) {
+      const socket = this.socket;
+      // Close without scheduling another backoff from this close.
+      this.intentionalClose = true;
+      socket.close();
+      if (this.socket === socket) this.socket = null;
+      this.intentionalClose = false;
+    }
+
+    this.connect();
   }
 
   // Note:
@@ -95,14 +118,13 @@ export class WebSocketMarketTransport implements MarketTransport {
   // }
   //
   // Grace period (UNSUBSCRIBE_GRACE_MS = 100):
-  // Without the grace period, that fake unmount would send a real UNSUBSCRIBE to the server, then immediately SUBSCRIBE again. The 100ms delay ignores that quick remount so the server subscription stays up..
+  // React Strict Mode remounts can unmount→remount quickly.
   // Without delay: SUBSCRIBE → UNSUBSCRIBE → SUBSCRIBE (wasteful flap).
   // With delay: unmount starts a 100ms timer; if remount happens first,
   // cancel the timer and keep the server subscription alive.
   // Only send UNSUBSCRIBE if nobody resubscribes within 100ms.
 
   subscribe(channel: MarketChannel, symbol: Symbol): Cleanup {
-    // Subscribe (for UI)
     const key = subscriptionKey(channel, symbol);
     const hadPendingUnsubscribe = this.pendingUnsubscribes.has(key);
     if (hadPendingUnsubscribe) {
@@ -119,7 +141,7 @@ export class WebSocketMarketTransport implements MarketTransport {
       this.queueSubscribe(channel, symbol);
     }
     this.connect();
-    // this.logSubscriptionCounts('subscribe', channel, symbol);
+    this.logSubscriptionCounts('subscribe', channel, symbol);
 
     return () => this.unsubscribe(channel, symbol);
   }
@@ -129,9 +151,9 @@ export class WebSocketMarketTransport implements MarketTransport {
     return () => this.messageListeners.delete(listener);
   }
 
-  onStatusChange(listener: (status: ConnectionStatus) => void): Cleanup {
+  onStatusChange(listener: (info: ConnectionInfo) => void): Cleanup {
     this.statusListeners.add(listener);
-    listener(this.status);
+    listener(this.connectionInfo());
     return () => this.statusListeners.delete(listener);
   }
 
@@ -142,12 +164,12 @@ export class WebSocketMarketTransport implements MarketTransport {
     if (count <= 0) return;
     if (count > 1) {
       symbols.set(symbol, count - 1);
-      // this.logSubscriptionCounts('unsubscribe', channel, symbol);
+      this.logSubscriptionCounts('unsubscribe', channel, symbol);
       return;
     }
 
     symbols.set(symbol, 0);
-    // this.logSubscriptionCounts('unsubscribe (grace)', channel, symbol);
+    this.logSubscriptionCounts('unsubscribe (grace)', channel, symbol);
     const key = subscriptionKey(channel, symbol);
     if (this.pendingUnsubscribes.has(key)) {
       clearTimeout(this.pendingUnsubscribes.get(key)!);
@@ -166,17 +188,22 @@ export class WebSocketMarketTransport implements MarketTransport {
           type: SUBSCRIPTION_ACTION.UNSUBSCRIBE,
           payload: { channels: [{ name: channel, symbols: [symbol] }] },
         });
-        // this.logSubscriptionCounts('unsubscribed', channel, symbol);
+        this.logSubscriptionCounts('unsubscribed', channel, symbol);
       }, UNSUBSCRIBE_GRACE_MS),
     );
   }
 
-  /** Debug: logs counts as { BTCUSD: { ticker: 2, orderbook: 1, trades: 1 } }. */
+  /**
+   * DEV-only: live ref-count snapshot for demos / interviews.
+   * Shape: { BTCUSD: { ticker: 2, orderbook: 1, trades: 1 } }
+   */
   private logSubscriptionCounts(
     reason: string,
     channel: MarketChannel,
     symbol: Symbol,
   ) {
+    if (!__DEV__) return;
+
     const bySymbol: Record<string, Record<string, number>> = {};
     for (const [ch, symbols] of this.subscriptions) {
       const short =
@@ -193,7 +220,7 @@ export class WebSocketMarketTransport implements MarketTransport {
         bySymbol[sym][short] = count;
       }
     }
-    console.log(`Ashish : [WS subscriptions] ${reason} ${channel} ${symbol}`, bySymbol);
+    console.log(`[WS subscriptions] ${reason} ${channel} ${symbol}`, bySymbol);
   }
 
   private queueSubscribe(channel: MarketChannel, symbol: Symbol) {
@@ -229,7 +256,6 @@ export class WebSocketMarketTransport implements MarketTransport {
         .map(([symbol]) => symbol);
       return subscribedSymbols.length ? [{ name, symbols: subscribedSymbols }] : [];
     });
-    console.log('Ashish : sendCurrentSubscriptions', JSON.stringify(channels));
     if (channels.length) {
       this.send({ type: SUBSCRIPTION_ACTION.SUBSCRIBE, payload: { channels } });
     }
@@ -242,14 +268,11 @@ export class WebSocketMarketTransport implements MarketTransport {
 
   private send(request: SubscriptionRequest) {
     if (this.socket?.readyState === WebSocket.OPEN) {
-      console.log('Ashish : send', JSON.stringify(request));
-      // send all current subscriptions
       this.socket.send(JSON.stringify(request));
     }
   }
 
   private handleMessage(raw: unknown) {
-    console.log('Ashish : handleMessage', JSON.stringify(raw));
     if (typeof raw !== 'string') return;
     try {
       const message = JSON.parse(raw) as MarketMessage;
@@ -261,7 +284,7 @@ export class WebSocketMarketTransport implements MarketTransport {
 
   private scheduleReconnect() {
     if (this.reconnectTimer || this.intentionalClose) return;
-    const delay = Math.min(1_000 * 2 ** this.retryCount, MAX_RETRY_DELAY_MS);
+    const delay = exponentialBackoffMs(this.retryCount);
     this.retryCount += 1;
     this.setStatus(CONNECTION_STATUS.RECONNECTING);
     this.reconnectTimer = setTimeout(() => {
@@ -270,10 +293,27 @@ export class WebSocketMarketTransport implements MarketTransport {
     }, delay);
   }
 
+  private connectionInfo(): ConnectionInfo {
+    const attempt =
+      this.status === CONNECTION_STATUS.CONNECTED ||
+      this.status === CONNECTION_STATUS.DISCONNECTED
+        ? 0
+        : this.retryCount;
+    return { status: this.status, attempt };
+  }
+
   private setStatus(status: ConnectionStatus) {
-    if (this.status === status) return;
     this.status = status;
-    this.statusListeners.forEach(listener => listener(status));
+    const info = this.connectionInfo();
+    if (
+      this.lastPublished &&
+      this.lastPublished.status === info.status &&
+      this.lastPublished.attempt === info.attempt
+    ) {
+      return;
+    }
+    this.lastPublished = info;
+    this.statusListeners.forEach(listener => listener(info));
   }
 }
 

@@ -2,6 +2,7 @@
  * @format
  */
 
+import { exponentialBackoffMs } from '../src/commonUtils/backoff';
 import { changeFromTickerRatio, formatPercent, normalizeSearchQuery } from '../src/utils/format';
 
 test('changeFromTickerRatio converts ratio to percent', () => {
@@ -16,4 +17,11 @@ test('formatPercent includes sign', () => {
 
 test('normalizeSearchQuery uppercases and trims', () => {
   expect(normalizeSearchQuery('  btc ')).toBe('BTC');
+});
+
+test('exponentialBackoffMs doubles then caps', () => {
+  expect(exponentialBackoffMs(0)).toBe(1_000);
+  expect(exponentialBackoffMs(1)).toBe(2_000);
+  expect(exponentialBackoffMs(2)).toBe(4_000);
+  expect(exponentialBackoffMs(10, { maxMs: 10_000 })).toBe(10_000);
 });

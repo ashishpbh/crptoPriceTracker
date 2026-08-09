@@ -17,5 +17,11 @@ export const CONNECTION_STATUS = {
 
 export type ConnectionStatus = (typeof CONNECTION_STATUS)[keyof typeof CONNECTION_STATUS];
 
+/** Live connection snapshot for UI (attempt > 0 while reconnecting). */
+export interface ConnectionInfo {
+  status: ConnectionStatus;
+  attempt: number;
+}
+
 /** Teardown fn returned by subscribe / listener registration. */
 export type Cleanup = () => void;

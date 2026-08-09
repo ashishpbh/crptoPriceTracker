@@ -13,6 +13,8 @@ const EMPTY_TRADES: TradeMessage[] = [];
 
 export const selectConnectionStatus = (state: MarketState): ConnectionStatus => state.status;
 
+export const selectReconnectAttempt = (state: MarketState): number => state.reconnectAttempt;
+
 export const selectTicker =
   (symbol: Symbol) =>
   (state: MarketState): TickerMessage | undefined =>
