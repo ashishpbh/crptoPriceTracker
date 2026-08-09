@@ -47,7 +47,7 @@ No external APIs are required — all market data comes from the local mock serv
 
 - **UI / logic split:** Screens and components never open a WebSocket. They call `marketRepository` through subscription hooks (`useTickerSubscriptions`, `useProductDetailSubscriptions`) and read Zustand via dedicated selectors.
 
-- **Transport:** A single shared WebSocket with ref-counted subscribe/unsubscribe, a short grace window for React Strict Mode remounts, and exponential reconnect via reusable `exponentialBackoffMs`. Status badge/footer supports tap-to-retry (skips backoff); `AppState` active resumes with `ensureConnected()`. `__DEV__` `[WS subscriptions]` logs show live channel/symbol ref-counts for demos.
+- **Transport:** A single shared WebSocket with ref-counted subscribe/unsubscribe, a short grace window for React Strict Mode remounts, and exponential reconnect via reusable `exponentialBackoffMs`. Tap-to-retry / AppState resume use `reconnectNow` with a socket **generation** so a late async `onclose` cannot schedule a ghost reconnect. `__DEV__` `[WS subscriptions]` logs show live channel/symbol ref-counts for demos.
 
 - **Errors:** Two failure domains — transport (badge retry / backoff / AppState) vs React render crashes (`AppErrorBoundary` with Try again).
 
