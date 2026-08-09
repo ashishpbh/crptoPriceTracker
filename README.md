@@ -1,97 +1,92 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Crypto Price Tracker
 
-# Getting Started
+React Native (CLI) app that shows live crypto market data from a local mock WebSocket server: searchable product list, product detail (ticker / orderbook / recent trades), persisted favorites, and reconnect-aware connection status.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Prerequisites
 
-## Step 1: Start Metro
+- Node.js `>= 22.11.0`
+- Xcode (iOS) and/or Android Studio (Android) set up for React Native
+- [Bun](https://bun.sh) for the mock market server
+- Mock server available as a sibling checkout named `socket-custom-load` (same protocol as [server/README.md](server/README.md))
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Setup
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+```bash
+# Terminal 1 — mock market data (WebSocket :8080, HTTP :3000)
+cd ../socket-custom-load
+bun install
+bun start
 
-```sh
-# Using npm
+# Terminal 2 — Metro bundler
+cd ../crptoPriceTracker
+npm install
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
+In a third terminal, run the app:
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+```bash
+# iOS (first time: cd ios && pod install)
 npm run ios
 
-# OR using Yarn
-yarn ios
+# or Android
+npm run android
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+Equivalent one-liner for the app after the mock server is already running:
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+```bash
+npm install && npm start
+```
 
-## Step 3: Modify your app
+**Hosts:** iOS Simulator uses `localhost`. Android emulator uses `10.0.2.2`. For a physical device, set your machine’s LAN IP in `src/api/marketConfig.ts`.
 
-Now that you have successfully run the app, let's make changes!
+No external APIs are required — all market data comes from the local mock server.
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+## Approach
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+- **UI / logic split:** Screens and components never open a WebSocket. They call `marketRepository` through subscription hooks (`useTickerSubscriptions`, `useProductDetailSubscriptions`) and read Zustand via dedicated selectors.
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+- **Transport:** A single shared WebSocket with ref-counted subscribe/unsubscribe, a short grace window for React Strict Mode remounts, and exponential reconnect backoff. Connection status is surfaced in the UI.
 
-## Congratulations! :tada:
+- **Performance:** Incoming messages are batched with `requestAnimationFrame` before store writes; order books are trimmed to the top 10 levels on ingest; trades are capped at 30; per-symbol selectors keep list row updates independent.
 
-You've successfully run and modified your React Native App. :partying_face:
+- **Favorites:** Persisted with Zustand + AsyncStorage so they survive app restarts.
 
-### Now what?
+- **Motion:** New trade rows highlight briefly via Reanimated.
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+## What I’d improve with more time
 
-# Troubleshooting
+- Stress-test UI (Normal / Fast / Extreme) wired to the server’s HTTP intervals API
+- Unit tests for transport ref-counting and buffer flush behavior
+- Mini candlestick chart from the `candlestick_*` channels
+- Physical-device host config via env / in-app settings instead of editing `marketConfig.ts`
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+## Project layout
 
-# Learn More
+```
+src/
+  commonUtils/   # Shared market primitives: SYMBOLS, channel names, WebSocket message types, orderbook shapes
+  api/           # Market data layer (see below)
+  stores/        # Zustand state: live market data + favorites
+  selectors/     # Narrow store selectors so UI only re-renders what it needs
+  hooks/         # Subscribe/unsubscribe lifecycle for ticker, orderbook, and trades
+  constants/     # Shared colors
+  utils/         # Formatting helpers (price, volume, search normalize)
+  i18.ts         # User-facing copy strings
+  screens/       # Route-level screens (Markets, Product Detail, Favorites, Splash)
+  components/    # Reusable UI (product row, orderbook, trades, connection status)
+  navigation/    # React Navigation stack, screen names, types
+```
 
-To learn more about React Native, take a look at the following resources:
+### `src/api/` (market data layer)
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+| File | Role |
+| --- | --- |
+| `marketConfig.ts` | WebSocket / HTTP host URLs (`localhost` on iOS, `10.0.2.2` on Android emulator) |
+
+| `websocketClient.ts` | WebSocket transport: connect, subscribe/unsubscribe, reconnect with backoff |
+
+| `marketBuffer.ts` | **requestAnimationFrame (rAF) buffer** — holds fast WebSocket updates and flushes them to the store once per screen frame so the UI is not rewritten on every message |
+
+| `marketRepository.ts` | App-facing API (`watchTicker`, `watchOrderbook`, `watchTrades`). Screens never open a socket directly |

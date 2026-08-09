@@ -1,0 +1,88 @@
+import { StyleSheet } from 'react-native';
+
+import { colors } from '@/constants/colors';
+
+export const productDetailStyles = StyleSheet.create({
+  screen: { backgroundColor: colors.detailBg, flex: 1 },
+  header: {
+    alignItems: 'center',
+    borderBottomColor: colors.detailBorder,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  backBtn: { alignItems: 'center', flexDirection: 'row', minWidth: 64 },
+  backChevron: {
+    color: colors.detailText,
+    fontSize: 28,
+    fontWeight: '300',
+    lineHeight: 28,
+    marginRight: 2,
+  },
+  backLabel: { color: colors.detailText, fontSize: 16, fontWeight: '500' },
+  headerCenter: { alignItems: 'center', flex: 1 },
+  symbol: { color: colors.detailText, fontSize: 17, fontWeight: '800' },
+  productName: { color: colors.detailMuted, fontSize: 12, marginTop: 2 },
+  star: {
+    color: colors.starInactiveLight,
+    fontSize: 26,
+    minWidth: 64,
+    textAlign: 'right',
+  },
+  starActive: { color: colors.starActiveLight },
+  priceBlock: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+    gap: 10,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+  },
+  lastPrice: {
+    color: colors.detailText,
+    fontSize: 34,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '800',
+  },
+  change: { fontSize: 16, fontWeight: '700' },
+  positive: { color: colors.changeUpLight },
+  negative: { color: colors.changeDownLight },
+  panels: {
+    borderTopColor: colors.detailBorder,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flex: 1,
+    flexDirection: 'row',
+  },
+  orderbookPane: {
+    borderRightColor: colors.detailBorder,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    flex: 1,
+  },
+  tradesPane: { flex: 1, minWidth: 0, paddingHorizontal: 12, paddingTop: 14 },
+  tradesTitle: {
+    color: colors.detailSecondary,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  tradeLabels: { flexDirection: 'row', marginBottom: 4, paddingHorizontal: 4 },
+  tradeLabel: {
+    color: colors.detailMuted,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  tradePrice: { flex: 1.2 },
+  tradeSize: { flex: 0.85, textAlign: 'right' },
+  tradeSide: { flex: 0.7, textAlign: 'right' },
+  tradeTime: { flex: 0.95, textAlign: 'right' },
+  tradesList: { flex: 1 },
+  emptyTrades: {
+    color: colors.detailMuted,
+    fontSize: 12,
+    paddingVertical: 16,
+    textAlign: 'center',
+  },
+});
