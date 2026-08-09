@@ -2,6 +2,8 @@
 
 React Native (CLI) app that shows live crypto market data from a local mock WebSocket server: searchable product list, product detail (ticker / orderbook / recent trades), persisted favorites, and reconnect-aware connection status.
 
+**Data flow & layers:** see [ARCHITECTURE.md](./ARCHITECTURE.md).
+
 ## Prerequisites
 
 - Node.js `>= 22.11.0`
@@ -87,29 +89,29 @@ src/
 | --- | --- |
 | `marketConfig.ts` | WebSocket / HTTP host URLs (`localhost` on iOS, `10.0.2.2` on Android emulator) |
 | `websocketClient.ts` | WebSocket transport: connect, ref-counted subscribe/unsubscribe, Strict Mode grace unsubscribe, `reconnectNow`, backoff via `exponentialBackoffMs` |
-| `marketBuffer.ts` | Channel-aware ingest buffer (see below) — coalesces fast WS updates before store writes |
+| `marketBuffer.ts` | Separates socket updates from state updates: WS messages land here first; store/`applyBatch` runs later (throttle + rAF), not on every tick (see below) |
 | `marketRepository.ts` | App-facing API (`watchTicker`, `watchOrderbook`, `watchTrades`). Screens never open a socket directly |
 
 ### Subscriptions (screen → channels)
 
-Subscribe only for data the **current screen** needs; unsubscribe on leave.
+**Intentional split:** each screen subscribes only to channels it renders. Markets does **not** open orderbook/trades — that traffic is heavy and unused on the list, so we keep the list cheap on purpose.
 
-| Screen | Channels |
-| --- | --- |
-| Markets / Favorites list | `v2/ticker` only |
-| Product detail | `v2/ticker` + `l2_orderbook` + `all_trades` |
+| Screen | Channels | Why this set |
+| --- | --- | --- |
+| Markets / Favorites | `v2/ticker` only | List needs last price + 24h change — nothing else |
+| Product detail | `v2/ticker` + `l2_orderbook` + `all_trades` | Detail is the only place book + tape are shown |
 
-No trade-tape or orderbook prefetch on the markets list.
+Unsubscribe on leave (ref-counted). Prefetching book/tape on Markets would burn bandwidth and CPU for UI the user never sees.
 
-**Wire vs server log:** Transport is ref-counted and sends **deltas only**. Opening product detail for `ETHUSD` does **not** resubscribe all market tickers — Markets is usually still mounted, so those tickers stay live and only `l2_orderbook` / `all_trades` (and a ticker ref-count bump) are new. If the mock server prints `Client subscriptions: [...]`, that is the **full aggregate** set for the client after the update, not a replay of every prior `subscribe` payload.
+**Wire vs server log:** Transport sends **deltas only**. Opening detail for `ETHUSD` does not resubscribe every market ticker — Markets usually stays mounted, so those tickers remain; the wire adds `l2_orderbook` / `all_trades` (and bumps the ticker ref-count). If the mock server prints `Client subscriptions: [...]`, that is the **full aggregate** client state after the update, not a replay of every prior `subscribe` payload.
 
 ### Buffering strategy (`marketBuffer.ts`)
 
-Mock tickers arrive every **10–50ms**. Painting every message makes the list jittery, so ingest is channel-aware:
+**Intentional tradeoff:** mock tickers arrive every **10–50ms**. Updating every list row that often feels noisy and wastes frames. Detail book/tape should feel live. So ingest is **channel-aware by design** — not a one-size flush for everything:
 
-| Channel | When | How | Why |
+| Channel | When (rate) | How (paint) | Why (product choice) |
 | --- | --- | --- | --- |
-| `v2/ticker` | Throttle (`TICKER_UI_THROTTLE_MS`, default **300ms**). Latest value in the window wins. | Flush on `requestAnimationFrame` | Calm markets list; paint-aligned store writes |
-| `l2_orderbook` / `all_trades` | Every pending update | `requestAnimationFrame` only | Detail stays snappy |
+| `v2/ticker` | Throttle `TICKER_UI_THROTTLE_MS` (**300ms**); latest in the window wins | Flush on `requestAnimationFrame` | Calm, readable markets list; still paint-aligned |
+| `l2_orderbook` / `all_trades` | Keep the latest update each frame (no 300ms wait) | Flush via `requestAnimationFrame` (once per screen frame) | Detail should feel live when prices move fast |
 
-`TICKER_UI_THROTTLE_MS = 0` → ticker path becomes rAF-only (legacy cadence). Store also skips ticker writes when UI-visible fields are unchanged.
+So: **list prefers calm; detail prefers immediacy.** Same pipeline, different policy per channel. `TICKER_UI_THROTTLE_MS = 0` falls back to rAF-only tickers. Store also skips ticker writes when UI-visible fields are unchanged.
