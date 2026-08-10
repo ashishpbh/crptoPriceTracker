@@ -165,4 +165,6 @@ flowchart TB
 | `src/selectors/marketSelectors.ts` | Narrow reads so one symbol doesn’t redraw the list |
 | `src/commonUtils/backoff.ts` | Reusable reconnect delay |
 
-Setup and product notes: [README.md](./README.md). Mock protocol: [server/README.md](./server/README.md).
+Setup and product notes: [README.md](./README.md). Mock protocol: [server/README.md](./server/README.md).  
+
+Interview deep-dives (why / tradeoffs / alternatives): [INTERVIEW_ARCHITECTURE_QA.md](./INTERVIEW_ARCHITECTURE_QA.md).

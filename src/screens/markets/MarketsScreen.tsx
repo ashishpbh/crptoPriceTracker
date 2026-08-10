@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { SYMBOLS, type Symbol } from '@/commonUtils';
 import { useTickerSubscriptions } from '@/hooks/useProductSubscriptions';
 import { navigateToProductDetail } from '@/navigation/navigationUtils';
@@ -9,14 +10,9 @@ import {
   selectFavoriteSymbols,
   selectToggleFavorite,
 } from '@/selectors/favoritesSelectors';
-import { marketRepository } from '@/api/marketRepository';
-import {
-  selectConnectionStatus,
-  selectReconnectAttempt,
-} from '@/selectors/marketSelectors';
 import { useFavoritesStore } from '@/stores/favoritesStore';
-import { useMarketStore } from '@/stores/marketStore';
 import { normalizeSearchQuery } from '@/utils/format';
+
 import { MarketsListSection } from './MarketsListSection';
 import { MarketsTabBar } from './MarketsTabBar';
 import { MarketsTopBar } from './MarketsTopBar';
@@ -25,8 +21,6 @@ import { marketsStyles as styles } from './styles';
 export function MarketsScreen({ navigation }: MarketsScreenProps) {
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<MarketsTab>(MARKETS_TAB.ALL);
-  const status = useMarketStore(selectConnectionStatus);
-  const attempt = useMarketStore(selectReconnectAttempt);
   const favorites = useFavoritesStore(selectFavoriteSymbols);
   const toggleFavorite = useFavoritesStore(selectToggleFavorite);
   useTickerSubscriptions(SYMBOLS);
@@ -34,9 +28,10 @@ export function MarketsScreen({ navigation }: MarketsScreenProps) {
   const products = useMemo(() => {
     const source = activeTab === MARKETS_TAB.ALL ? SYMBOLS : favorites;
     const normalizedQuery = normalizeSearchQuery(query);
+    // Keep the same array reference when unfiltered (avoids FlashList data churn).
     return normalizedQuery
       ? source.filter(symbol => symbol.includes(normalizedQuery))
-      : [...source];
+      : source;
   }, [activeTab, favorites, query]);
 
   const onPressProduct = useCallback(
@@ -51,13 +46,7 @@ export function MarketsScreen({ navigation }: MarketsScreenProps) {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.screen}>
-      <MarketsTopBar
-        attempt={attempt}
-        onChangeQuery={setQuery}
-        onRetry={() => marketRepository.reconnect()}
-        query={query}
-        status={status}
-      />
+      <MarketsTopBar onChangeQuery={setQuery} query={query} />
       <MarketsListSection
         activeTab={activeTab}
         onPressProduct={onPressProduct}

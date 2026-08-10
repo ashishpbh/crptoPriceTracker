@@ -31,6 +31,13 @@ export interface TradeMessage {
   buyer_role: (typeof TRADE_ROLE)[keyof typeof TRADE_ROLE];
   seller_role: (typeof TRADE_ROLE)[keyof typeof TRADE_ROLE];
   timestamp: number;
+  /** Instrument id from server (same for all trades of a symbol — not unique per print). */
+  product_id?: number;
+  /**
+   * App-assigned unique row id (`${product_id|symbol}_${seq}`).
+   * Server all_trades has no trade_id; FlashList needs a stable unique key.
+   */
+  id?: string;
 }
 
 export interface SubscriptionsAck {

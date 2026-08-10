@@ -39,6 +39,8 @@ export class MarketBuffer {
   private tickerFrameId: number | null = null;
   private tickerThrottleTimer: ReturnType<typeof setTimeout> | null = null;
   private lastTickerFlushAt = 0;
+  /** Monotonic seq for local trade ids (server has no per-trade id). */
+  private tradeSeq = 0;
 
   constructor(private readonly onFlush: FlushListener) {}
 
@@ -55,12 +57,20 @@ export class MarketBuffer {
         toOrderbookSnapshot(message.bids, message.asks, message.timestamp),
       );
     } else {
-      const symbolTrades = this.pendingTrades.get(message.symbol) ?? [];
-      symbolTrades.push(message);
-      this.pendingTrades.set(message.symbol, symbolTrades);
+      const stamped = this.stampTradeId(message);
+      const symbolTrades = this.pendingTrades.get(stamped.symbol) ?? [];
+      symbolTrades.push(stamped);
+      this.pendingTrades.set(stamped.symbol, symbolTrades);
     }
 
     this.scheduleBookFrameFlush();
+  }
+
+  /** `product_id_seq` — product_id alone is the instrument, not unique per trade. */
+  private stampTradeId(trade: TradeMessage): TradeMessage {
+    this.tradeSeq += 1;
+    const productKey = trade.product_id ?? trade.symbol;
+    return { ...trade, id: `${productKey}_${this.tradeSeq}` };
   }
 
   dispose() {

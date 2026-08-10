@@ -9,7 +9,8 @@ import { i18 } from '@/i18';
 import { productDetailStyles as styles } from './styles';
 
 function tradeKey(trade: TradeMessage) {
-  return `${trade.timestamp}-${trade.price}-${trade.size}-${trade.buyer_role}`;
+  // Prefer app-stamped id (`productId_seq`); fall back for any unstamped edge case.
+  return trade.id ?? `${trade.timestamp}-${trade.price}-${trade.size}-${trade.buyer_role}`;
 }
 
 function keyExtractor(item: TradeMessage) {
@@ -66,6 +67,7 @@ export function RecentTradesPanel({ trades }: { trades: TradeMessage[] }) {
         ListEmptyComponent={
           <Text style={styles.emptyTrades}>{i18.waitingForTrades}</Text>
         }
+        maintainVisibleContentPosition={{ autoscrollToTopThreshold: 0 }}
         renderItem={renderTrade}
         style={styles.tradesList}
       />

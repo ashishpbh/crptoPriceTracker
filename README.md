@@ -2,7 +2,7 @@
 
 React Native (CLI) app that shows live crypto market data from a local mock WebSocket server: searchable product list, product detail (ticker / orderbook / recent trades), persisted favorites, and reconnect-aware connection status.
 
-**Data flow & layers:** see [ARCHITECTURE.md](./ARCHITECTURE.md).
+**Data flow & layers:** see [ARCHITECTURE.md](./ARCHITECTURE.md).  
 
 ## Prerequisites
 

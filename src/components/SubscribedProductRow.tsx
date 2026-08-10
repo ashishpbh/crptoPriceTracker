@@ -15,8 +15,8 @@ function SubscribedProductRowComponent({
   forceFavorite,
 }: {
   symbol: Symbol;
-  onPress: () => void;
-  onToggleFavorite: () => void;
+  onPress: (symbol: Symbol) => void;
+  onToggleFavorite: (symbol: Symbol) => void;
   /** Favorites screen always shows starred rows. */
   forceFavorite?: boolean;
 }) {

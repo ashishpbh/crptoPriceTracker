@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Text, View } from 'react-native';
 
 import type { Symbol } from '@/commonUtils';
@@ -7,7 +8,7 @@ import { MARKETS_TAB, type MarketsTab } from '@/navigation/screenNames';
 import { MarketsProductList } from './MarketsProductList';
 import { marketsStyles as styles } from './styles';
 
-export function MarketsListSection({
+function MarketsListSectionComponent({
   activeTab,
   products,
   onPressProduct,
@@ -18,7 +19,6 @@ export function MarketsListSection({
   onPressProduct: (symbol: Symbol) => void;
   onToggleFavorite: (symbol: Symbol) => void;
 }) {
-
   if (activeTab === MARKETS_TAB.FAVORITES && products.length === 0) {
     return (
       <View style={styles.emptyWrap}>
@@ -37,3 +37,5 @@ export function MarketsListSection({
     />
   );
 }
+
+export const MarketsListSection = memo(MarketsListSectionComponent);

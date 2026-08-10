@@ -1,6 +1,6 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { Symbol, TickerMessage } from '@/commonUtils';
+import { PRODUCT_ROW_HEIGHT, type Symbol, type TickerMessage } from '@/commonUtils';
 import { colors } from '@/constants/colors';
 import { i18 } from '@/i18';
 import { changeFromTickerRatio, formatPercent, formatPrice } from '@/utils/format';
@@ -9,8 +9,8 @@ interface ProductRowProps {
   symbol: Symbol;
   ticker?: TickerMessage;
   isFavorite: boolean;
-  onPress: () => void;
-  onToggleFavorite: () => void;
+  onPress: (symbol: Symbol) => void;
+  onToggleFavorite: (symbol: Symbol) => void;
 }
 
 function ProductRowComponent({
@@ -23,8 +23,14 @@ function ProductRowComponent({
   const change = ticker ? changeFromTickerRatio(ticker.ltp_change_24h) : 0;
   const positive = change >= 0;
 
+  const handlePress = useCallback(() => onPress(symbol), [onPress, symbol]);
+  const handleToggleFavorite = useCallback(
+    () => onToggleFavorite(symbol),
+    [onToggleFavorite, symbol],
+  );
+
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.row}>
+    <Pressable accessibilityRole="button" onPress={handlePress} style={styles.row}>
       <View style={styles.symbolBlock}>
         <View style={styles.coin}>
           <Text style={styles.coinText}>{symbol.slice(0, 1)}</Text>
@@ -43,7 +49,7 @@ function ProductRowComponent({
       <Pressable
         accessibilityLabel={`Toggle ${symbol} favorite`}
         hitSlop={12}
-        onPress={onToggleFavorite}
+        onPress={handleToggleFavorite}
         style={styles.favorite}>
         <Text style={[styles.star, isFavorite && styles.starActive]}>
           {isFavorite ? '★' : '☆'}
@@ -61,7 +67,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.marketsBorder,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    minHeight: 76,
+    height: PRODUCT_ROW_HEIGHT,
     paddingHorizontal: 20,
   },
   symbolBlock: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 11 },
