@@ -2,48 +2,65 @@
 
 React Native (CLI) app that shows live crypto market data from a local mock WebSocket server: searchable product list, product detail (ticker / orderbook / recent trades), persisted favorites, and reconnect-aware connection status.
 
-**Data flow & layers:** see [ARCHITECTURE.md](./ARCHITECTURE.md).  
+**App repo:** [https://github.com/ashishpbh/crptoPriceTracker](https://github.com/ashishpbh/crptoPriceTracker)  
+**Mock server repo:** [https://github.com/saxenanickk/socket-custom-load](https://github.com/saxenanickk/socket-custom-load)  
+**Data flow & layers:** see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Prerequisites
 
 - Node.js `>= 22.11.0`
 - Xcode (iOS) and/or Android Studio (Android) set up for React Native
 - [Bun](https://bun.sh) for the mock market server
-- Mock server available as a sibling checkout named `socket-custom-load` (same protocol as [server/README.md](server/README.md))
 
 ## Setup
 
+Clone both repos as **siblings** in the same parent folder:
+
 ```bash
-# Terminal 1 — mock market data (WebSocket :8080, HTTP :3000)
-cd ../socket-custom-load
+mkdir -p ~/Assignment && cd ~/Assignment
+git clone https://github.com/ashishpbh/crptoPriceTracker.git
+git clone https://github.com/saxenanickk/socket-custom-load.git
+```
+
+You should end up with:
+
+```text
+Assignment/
+  crptoPriceTracker/
+  socket-custom-load/
+```
+
+**Terminal 1 — mock market server** (WebSocket `:8080`, HTTP `:3000`):
+
+```bash
+cd ~/Assignment/socket-custom-load
 bun install
 bun start
+```
 
-# Terminal 2 — Metro bundler
-cd ../crptoPriceTracker
+**Terminal 2 — Metro bundler:**
+
+```bash
+cd ~/Assignment/crptoPriceTracker
 npm install
 npm start
 ```
 
-In a third terminal, run the app:
+**Terminal 3 — run the app** (keep Metro running):
 
 ```bash
-# iOS (first time: cd ios && pod install)
+cd ~/Assignment/crptoPriceTracker
+
+# iOS (first time only: cd ios && pod install && cd ..)
 npm run ios
 
 # or Android
 npm run android
 ```
 
-Equivalent one-liner for the app after the mock server is already running:
-
-```bash
-npm install && npm start
-```
-
 **Hosts:** iOS Simulator uses `localhost`. Android emulator uses `10.0.2.2`. For a physical device, set your machine’s LAN IP in `src/api/marketConfig.ts`.
 
-No external APIs are required — all market data comes from the local mock server.
+No external APIs are required — all market data comes from the local mock server ([socket-custom-load](https://github.com/saxenanickk/socket-custom-load)). The bundled [server/README.md](server/README.md) documents the same WebSocket / intervals protocol.
 
 ## Approach
 
