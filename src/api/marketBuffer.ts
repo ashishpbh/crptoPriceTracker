@@ -171,7 +171,8 @@ function toDepthLevels(levels: [string, string][], direction: 'asc' | 'desc'): D
   for (let index = 0; index < levels.length; index++) {
     const price = Number(levels[index][0]);
     const quantity = Number(levels[index][1]);
-    if (!Number.isFinite(price) || !Number.isFinite(quantity)) continue;
+    // Skip invalid / zero-size levels so the UI never paints a blank depth slot.
+    if (!Number.isFinite(price) || !Number.isFinite(quantity) || quantity <= 0) continue;
 
     if (best.length < VISIBLE_DEPTH) {
       best.push({ price, quantity });

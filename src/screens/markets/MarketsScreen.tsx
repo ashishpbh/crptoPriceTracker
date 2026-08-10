@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { SYMBOLS, type Symbol } from '@/commonUtils';
 import { useTickerSubscriptions } from '@/hooks/useProductSubscriptions';
+import { i18 } from '@/i18';
 import { navigateToProductDetail } from '@/navigation/navigationUtils';
 import { MARKETS_TAB, type MarketsTab } from '@/navigation/screenNames';
 import type { MarketsScreenProps } from '@/navigation/types';
@@ -30,7 +31,10 @@ export function MarketsScreen({ navigation }: MarketsScreenProps) {
     const normalizedQuery = normalizeSearchQuery(query);
     // Keep the same array reference when unfiltered (avoids FlashList data churn).
     return normalizedQuery
-      ? source.filter(symbol => symbol.includes(normalizedQuery))
+      ? source.filter(symbol => {
+          const name = i18.productNames[symbol].toUpperCase();
+          return symbol.includes(normalizedQuery) || name.includes(normalizedQuery);
+        })
       : source;
   }, [activeTab, favorites, query]);
 

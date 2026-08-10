@@ -35,10 +35,4 @@ export const orderBookStyles = StyleSheet.create({
     paddingVertical: 7,
   },
   spreadText: { color: colors.detailSpreadText, fontSize: 11, fontWeight: '600' },
-  loading: {
-    color: colors.detailMuted,
-    fontSize: 12,
-    paddingVertical: 16,
-    textAlign: 'center',
-  },
 });

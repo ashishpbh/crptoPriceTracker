@@ -33,7 +33,7 @@ export function ProductDetailScreen({ navigation, route }: ProductDetailScreenPr
   const rawSymbol = route.params.symbol;
   const symbol: Symbol = isSymbol(rawSymbol) ? rawSymbol : 'BTCUSD';
 
-  useProductDetailSubscriptions(symbol);
+  useProductDetailSubscriptions(symbol, navigation);
 
   const ticker = useMarketStore(selectTicker(symbol));
   const orderbook = useMarketStore(selectOrderbook(symbol));

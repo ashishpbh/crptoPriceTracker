@@ -2,11 +2,14 @@ import { FlashList } from '@shopify/flash-list';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
-import type { TradeMessage } from '@/commonUtils';
+import { TRADE_ROW_HEIGHT, type TradeMessage } from '@/commonUtils';
+import { SkeletonRows } from '@/components/skeleton';
 import { TradeRow } from '@/components/tradeRow';
 import { i18 } from '@/i18';
 
 import { productDetailStyles as styles } from './styles';
+
+const TRADE_SKELETON_COLUMNS = [1.2, 0.85, 0.7, 0.95] as const;
 
 function tradeKey(trade: TradeMessage) {
   // Prefer app-stamped id (`productId_seq`); fall back for any unstamped edge case.
@@ -60,17 +63,23 @@ export function RecentTradesPanel({ trades }: { trades: TradeMessage[] }) {
         <Text style={[styles.tradeLabel, styles.tradeSide]}>{i18.columnSide}</Text>
         <Text style={[styles.tradeLabel, styles.tradeTime]}>{i18.columnTime}</Text>
       </View>
-      <FlashList
-        data={trades}
-        extraData={flashKey}
-        keyExtractor={keyExtractor}
-        ListEmptyComponent={
-          <Text style={styles.emptyTrades}>{i18.waitingForTrades}</Text>
-        }
-        maintainVisibleContentPosition={{ autoscrollToTopThreshold: 0 }}
-        renderItem={renderTrade}
-        style={styles.tradesList}
-      />
+      {trades.length === 0 ? (
+        <SkeletonRows
+          columns={TRADE_SKELETON_COLUMNS}
+          count={10}
+          rowHeight={TRADE_ROW_HEIGHT}
+          style={styles.tradesList}
+        />
+      ) : (
+        <FlashList
+          data={trades}
+          extraData={flashKey}
+          keyExtractor={keyExtractor}
+          maintainVisibleContentPosition={{ autoscrollToTopThreshold: 0 }}
+          renderItem={renderTrade}
+          style={styles.tradesList}
+        />
+      )}
     </View>
   );
 }

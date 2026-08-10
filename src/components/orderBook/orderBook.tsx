@@ -8,6 +8,7 @@ import {
   type DepthLevel,
   type OrderbookSnapshot,
 } from '@/commonUtils';
+import { OrderbookSkeleton } from '@/components/skeleton';
 import { i18 } from '@/i18';
 
 import { OrderBookDepthRow } from './orderBookDepthRow';
@@ -22,6 +23,8 @@ export function Orderbook({ orderbook }: { orderbook?: OrderbookSnapshot }) {
     () => (orderbook?.bids ?? []).slice(0, VISIBLE_ORDERBOOK_LEVELS),
     [orderbook?.bids],
   );
+  // Asks: best→worst from feed; reverse so best sits against the spread (no inverted list).
+  const askRows = useMemo(() => [...asks].reverse(), [asks]);
   const bestAsk = asks[0]?.price;
   const bestBid = bids[0]?.price;
   const spread = bestAsk != null && bestBid != null ? bestAsk - bestBid : null;
@@ -40,17 +43,21 @@ export function Orderbook({ orderbook }: { orderbook?: OrderbookSnapshot }) {
         <Text style={[styles.label, styles.colSize]}>{i18.columnSize}</Text>
         <Text style={[styles.label, styles.colTotal]}>{i18.columnTotal}</Text>
       </View>
-      {/* Asks: best near spread (bottom) via inverted FlashList — recycles when depth grows. */}
-      <DepthSide levels={asks} maxDepth={maxDepth} side="ask" />
-      <View style={styles.spread}>
-        <Text style={styles.spreadText}>
-          {spread != null && spreadPct != null
-            ? `${i18.spreadLabel}: $${spread.toFixed(2)} (${spreadPct.toFixed(3)}%)`
-            : `${i18.spreadLabel}: —`}
-        </Text>
-      </View>
-      <DepthSide levels={bids} maxDepth={maxDepth} side="bid" />
-      {!orderbook && <Text style={styles.loading}>{i18.waitingForOrderbook}</Text>}
+      {orderbook ? (
+        <>
+          <DepthSide levels={askRows} maxDepth={maxDepth} side="ask" />
+          <View style={styles.spread}>
+            <Text style={styles.spreadText}>
+              {spread != null && spreadPct != null
+                ? `${i18.spreadLabel}: $${spread.toFixed(2)} (${spreadPct.toFixed(3)}%)`
+                : `${i18.spreadLabel}: —`}
+            </Text>
+          </View>
+          <DepthSide levels={bids} maxDepth={maxDepth} side="bid" />
+        </>
+      ) : (
+        <OrderbookSkeleton />
+      )}
     </View>
   );
 }
@@ -64,8 +71,7 @@ function DepthSide({
   maxDepth: number;
   side: 'ask' | 'bid';
 }) {
-  const inverted = side === 'ask';
-  // Cap at content height so small books stay tight; flex:1 splits the pane when levels grow.
+  // Cap at content height so small books stay tight; flex:1 scrolls when levels grow past the pane.
   const contentHeight = levels.length * ORDERBOOK_ROW_HEIGHT;
 
   const renderItem = useCallback(
@@ -75,8 +81,9 @@ function DepthSide({
     [maxDepth, side],
   );
 
+  // Slot index stays stable across price churn (price keys remount cells every tick).
   const keyExtractor = useCallback(
-    (item: DepthLevel) => `${side}-${item.price}`,
+    (_item: DepthLevel, index: number) => `${side}-${index}`,
     [side],
   );
 
@@ -85,7 +92,6 @@ function DepthSide({
       <FlashList
         data={levels}
         extraData={maxDepth}
-        inverted={inverted}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
