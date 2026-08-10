@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
 
+import { ORDERBOOK_ROW_HEIGHT } from '@/commonUtils';
 import { colors } from '@/constants/colors';
 
 export const orderBookStyles = StyleSheet.create({
@@ -10,10 +11,12 @@ export const orderBookStyles = StyleSheet.create({
   colPrice: { flex: 1.15 },
   colSize: { flex: 0.9, textAlign: 'right' },
   colTotal: { flex: 0.95, textAlign: 'right' },
+  // flex:1 shares pane when levels exceed space; maxHeight (set in JS) hugs small books.
+  depthList: { flex: 1, minHeight: 0 },
   row: {
     alignItems: 'center',
     flexDirection: 'row',
-    height: 22,
+    height: ORDERBOOK_ROW_HEIGHT,
     overflow: 'hidden',
     paddingHorizontal: 4,
   },

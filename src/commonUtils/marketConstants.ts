@@ -17,11 +17,23 @@ export const TRADE_ROLE = {
   TAKER: 'taker',
 } as const;
 
-/** Top orderbook levels kept on ingest (server sends ~500). */
+/**
+ * Top orderbook levels kept on ingest (server sends ~500).
+ * Must be >= VISIBLE_ORDERBOOK_LEVELS so the UI slice is fully buffered.
+ */
 export const VISIBLE_DEPTH = 10;
 
-/** Levels rendered in the orderbook UI. */
+/** Levels rendered in the orderbook UI — raise freely; FlashList recycles. */
 export const VISIBLE_ORDERBOOK_LEVELS = 8;
+
+/** Fixed row height for depth cells (keeps FlashList layout stable). */
+export const ORDERBOOK_ROW_HEIGHT = 22;
+
+/** Fixed row height for recent-trade cells (keeps FlashList layout stable). */
+export const TRADE_ROW_HEIGHT = 28;
+
+/** Fixed row height for markets product rows (keeps FlashList layout stable). */
+export const PRODUCT_ROW_HEIGHT = 76;
 
 /** Newest trades retained per symbol. */
 export const MAX_TRADES_PER_SYMBOL = 30;

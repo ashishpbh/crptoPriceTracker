@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Text, View } from 'react-native';
 
 import type { DepthLevel } from '@/commonUtils';
@@ -5,7 +6,7 @@ import { formatPrice } from '@/utils/format';
 
 import { orderBookStyles as styles } from './styles';
 
-export function OrderBookDepthRow({
+function OrderBookDepthRowComponent({
   level,
   maxDepth,
   side,
@@ -32,3 +33,5 @@ export function OrderBookDepthRow({
     </View>
   );
 }
+
+export const OrderBookDepthRow = memo(OrderBookDepthRowComponent);

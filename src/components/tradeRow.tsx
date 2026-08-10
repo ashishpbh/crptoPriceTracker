@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { TRADE_ROLE, type TradeMessage } from '@/commonUtils';
+import { TRADE_ROLE, TRADE_ROW_HEIGHT, type TradeMessage } from '@/commonUtils';
 import { colors } from '@/constants/colors';
 import { i18 } from '@/i18';
 import { formatPrice, formatTradeTime } from '@/utils/format';
@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 4,
     flexDirection: 'row',
-    height: 28,
+    height: TRADE_ROW_HEIGHT,
     paddingHorizontal: 4,
   },
   price: { flex: 1.2, fontSize: 11, fontVariant: ['tabular-nums'], fontWeight: '700' },

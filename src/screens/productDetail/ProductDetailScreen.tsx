@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -42,12 +43,21 @@ export function ProductDetailScreen({ navigation, route }: ProductDetailScreenPr
   const isFavorite = useFavoritesStore(selectIsFavorite(symbol));
   const toggleFavorite = useFavoritesStore(selectToggleFavorite);
 
+  const onBack = useCallback(() => navigateBack(navigation), [navigation]);
+
+  const onToggleFavorite = useCallback(
+    () => toggleFavorite(symbol),
+    [toggleFavorite, symbol],
+  );
+  
+  const onRetry = useCallback(() => marketRepository.reconnect(), []);
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.screen}>
       <ProductDetailHeader
         isFavorite={isFavorite}
-        onBack={() => navigateBack(navigation)}
-        onToggleFavorite={() => toggleFavorite(symbol)}
+        onBack={onBack}
+        onToggleFavorite={onToggleFavorite}
         symbol={symbol}
       />
       <ProductPriceBlock ticker={ticker} />
@@ -60,7 +70,7 @@ export function ProductDetailScreen({ navigation, route }: ProductDetailScreenPr
       </View>
       <ConnectionStatusBadge
         attempt={attempt}
-        onRetry={() => marketRepository.reconnect()}
+        onRetry={onRetry}
         status={status}
         variant="footer"
       />

@@ -1,25 +1,30 @@
+import { useCallback } from 'react';
 import { Text, TextInput, View } from 'react-native';
 
-import type { ConnectionStatus } from '@/commonUtils';
+import { marketRepository } from '@/api/marketRepository';
 import { ConnectionStatusBadge } from '@/components/connectionStatus';
 import { colors } from '@/constants/colors';
 import { i18 } from '@/i18';
+import {
+  selectConnectionStatus,
+  selectReconnectAttempt,
+} from '@/selectors/marketSelectors';
+import { useMarketStore } from '@/stores/marketStore';
 
 import { marketsStyles as styles } from './styles';
 
+/** Owns connection status so list tree is not re-rendered on connect/reconnect. */
 export function MarketsTopBar({
-  status,
-  attempt = 0,
-  onRetry,
   query,
   onChangeQuery,
 }: {
-  status: ConnectionStatus;
-  attempt?: number;
-  onRetry?: () => void;
   query: string;
   onChangeQuery: (value: string) => void;
 }) {
+  const status = useMarketStore(selectConnectionStatus);
+  const attempt = useMarketStore(selectReconnectAttempt);
+  const onRetry = useCallback(() => marketRepository.reconnect(), []);
+
   return (
     <>
       <View style={styles.header}>

@@ -24,8 +24,8 @@ function MarketsProductListComponent({
     ({ item }: { item: Symbol }) => (
       <SubscribedProductRow
         forceFavorite={forceFavorite}
-        onPress={() => onPressProduct(item)}
-        onToggleFavorite={() => onToggleFavorite(item)}
+        onPress={onPressProduct}
+        onToggleFavorite={onToggleFavorite}
         symbol={item}
       />
     ),

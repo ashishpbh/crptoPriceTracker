@@ -236,7 +236,6 @@ export class WebSocketMarketTransport implements MarketTransport {
         bySymbol[sym][short] = count;
       }
     }
-    console.log(`[WS subscriptions] ${reason} ${channel} ${symbol}`, bySymbol);
   }
 
   private queueSubscribe(channel: MarketChannel, symbol: Symbol) {

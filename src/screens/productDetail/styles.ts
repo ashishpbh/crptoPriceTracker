@@ -60,7 +60,7 @@ export const productDetailStyles = StyleSheet.create({
     borderRightWidth: StyleSheet.hairlineWidth,
     flex: 1,
   },
-  tradesPane: { flex: 1, minWidth: 0, paddingHorizontal: 12, paddingTop: 14 },
+  tradesPane: { flex: 1, minHeight: 0, minWidth: 0, paddingHorizontal: 12, paddingTop: 14 },
   tradesTitle: {
     color: colors.detailSecondary,
     fontSize: 16,
