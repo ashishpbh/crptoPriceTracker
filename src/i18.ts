@@ -9,14 +9,13 @@ export const i18 = {
 
   marketsEyebrow: 'MARKETS',
   marketsTitle: 'Crypto tracker',
-  searchPlaceholder: 'Search BTC, ETH, SOL...',
+  searchPlaceholder: 'Search BTC, Bitcoin, ETH…',
   productColumn: 'PRODUCT',
   priceColumn: 'LAST PRICE / 24H',
   favoritesButton: '★  Favorites',
   tabAll: 'All',
   tabFavorites: 'Favorites',
   waitingForPrice: 'Waiting for price',
-  quotePerpetual: 'USD Perpetual',
 
   favoritesTitle: 'Favorites',
   favoritesEmptyTitle: 'No favorites yet',

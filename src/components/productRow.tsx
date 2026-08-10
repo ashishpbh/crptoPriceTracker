@@ -37,7 +37,7 @@ function ProductRowComponent({
         </View>
         <View>
           <Text style={styles.symbol}>{symbol.replace('USD', '')}</Text>
-          <Text style={styles.quote}>{i18.quotePerpetual}</Text>
+          <Text style={styles.quote}>{i18.productNames[symbol]}</Text>
         </View>
       </View>
       <View style={styles.priceBlock}>

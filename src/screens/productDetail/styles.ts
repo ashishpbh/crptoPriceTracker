@@ -79,10 +79,4 @@ export const productDetailStyles = StyleSheet.create({
   tradeSide: { flex: 0.7, textAlign: 'right' },
   tradeTime: { flex: 0.95, textAlign: 'right' },
   tradesList: { flex: 1 },
-  emptyTrades: {
-    color: colors.detailMuted,
-    fontSize: 12,
-    paddingVertical: 16,
-    textAlign: 'center',
-  },
 });

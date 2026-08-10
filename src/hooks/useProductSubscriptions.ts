@@ -1,7 +1,15 @@
 import { useEffect } from 'react';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { marketRepository } from '@/api/marketRepository';
 import type { Symbol } from '@/commonUtils';
+import { SCREEN } from '@/navigation/screenNames';
+import type { RootStackParamList } from '@/navigation/types';
+
+type DetailNavigation = NativeStackNavigationProp<
+  RootStackParamList,
+  typeof SCREEN.PRODUCT_DETAIL
+>;
 
 /** Subscribe to tickers for the lifetime of the screen. */
 export function useTickerSubscriptions(symbols: readonly Symbol[]) {
@@ -15,14 +23,43 @@ export function useTickerSubscriptions(symbols: readonly Symbol[]) {
   }, [symbolKey]);
 }
 
-/** Detail view: ticker + orderbook + trades for one symbol. */
-export function useProductDetailSubscriptions(symbol: Symbol) {
+/**
+ * Detail view subscriptions.
+ * Ticker starts immediately (usually already live from Markets).
+ * Orderbook + trades wait for the native push to finish (`transitionEnd`)
+ * so nav stays smooth. `InteractionManager` is deprecated on RN 0.82+.
+ */
+export function useProductDetailSubscriptions(
+  symbol: Symbol,
+  navigation: DetailNavigation,
+) {
   useEffect(() => {
-    const unsubscribers = [
-      marketRepository.watchTicker(symbol),
-      marketRepository.watchOrderbook(symbol),
-      marketRepository.watchTrades(symbol),
-    ];
-    return () => unsubscribers.forEach(unsubscribe => unsubscribe());
-  }, [symbol]);
+    const unsubTicker = marketRepository.watchTicker(symbol);
+    let unsubBook: (() => void) | undefined;
+    let unsubTrades: (() => void) | undefined;
+    let heavyStarted = false;
+
+    const startHeavy = () => {
+      if (heavyStarted) return;
+      heavyStarted = true;
+      unsubBook = marketRepository.watchOrderbook(symbol);
+      unsubTrades = marketRepository.watchTrades(symbol);
+    };
+
+    const unsubTransition = navigation.addListener('transitionEnd', event => {
+      if (event.data.closing) return;
+      startHeavy();
+    });
+
+    // Safety net if transitionEnd never fires (animation disabled / edge cases).
+    const fallbackTimer = setTimeout(startHeavy, 400);
+
+    return () => {
+      unsubTransition();
+      clearTimeout(fallbackTimer);
+      unsubTicker();
+      unsubBook?.();
+      unsubTrades?.();
+    };
+  }, [symbol, navigation]);
 }
